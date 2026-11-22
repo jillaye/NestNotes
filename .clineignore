@@ -1,0 +1,27 @@
+# Dependencies & Package Locks
+
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Expo & React Native Build Artifacts
+
+.expo/
+.expo-shared/
+dist/
+web-build/
+android/
+ios/
+
+# Git, Logs & OS Files
+
+.git/
+\*.log
+Thumbs.db
+desktop.ini
+
+# Large Media or Raw Map Exports (keep only small sample GeoJSONs visible)
+
+_.mbtiles
+_.sqlite
