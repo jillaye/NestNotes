@@ -31,6 +31,7 @@ Every milestone ends with **Done when** checks plus `npx expo lint` and `npx tsc
 ## M1: Types & database
 
 Files:
+
 - `src/types/index.ts`: `Collection`, `NestBox`, `Observation` (discriminated union on `kind: 'nest' | 'box' | 'legacy'`), `SyncStatus`, `Role`, `User`.
 - `src/db/schema.ts`: `migrateDbIfNeeded(db)` using `PRAGMA user_version`, `journal_mode = WAL`, `foreign_keys = ON`.
 - `src/db/collections.ts`, `boxes.ts`, `observations.ts`: small async functions taking `SQLiteDatabase`.
@@ -38,10 +39,10 @@ Files:
 
 Schema v1 (common sync columns on every table):
 
-| Table | Columns |
-|---|---|
-| `collections` | `id`, `name`, `created_at` |
-| `nest_boxes` | `id`, `collection_id` → collections, `name`, `latitude`, `longitude`, `properties_json` (unknown GeoJSON properties kept, e.g. `time`) |
+| Table          | Columns                                                                                                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `collections`  | `id`, `name`, `created_at`                                                                                                                                                                                                                        |
+| `nest_boxes`   | `id`, `collection_id` → collections, `name`, `latitude`, `longitude`, `properties_json` (unknown GeoJSON properties kept, e.g. `time`)                                                                                                            |
 | `observations` | `id`, `box_id` → nest_boxes, `kind`, `observed_on` (`YYYY-MM-DD`), `inspector` (null for legacy), `nests`, `eggs`, `chicks`, `cleaned_out` (nest only), `box_not_found`, `box_gone_pole_present`, `pole_cut_down` (box only), `notes` (all kinds) |
 
 Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
@@ -55,6 +56,7 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 ## M2: GeoJSON import (legacy + NestNotes format)
 
 `src/lib/geojson.ts`: `parseCollection(text): { name?: string; boxes: ParsedBox[]; skipped: number }`
+
 - Accepts a `FeatureCollection` of `Point` features. Coordinates are `[lon, lat]`. Validate lat −90..90 and lon −180..180. Skip and count invalid features.
 - **NestNotes format** (has top-level `"nestnotes": { "version": 1 }`): read `properties.name` and `properties.observations[]`, so the app can import its own exports (M8).
 - **Legacy format** (e.g. `Sample.geojson`): name = `properties.name`. Non-empty `properties.desc` → **one `legacy` observation** with `notes = desc.trim()` and `observed_on` = date part of `properties.time` (fallback: import date). Other properties go to `properties_json`.
@@ -67,16 +69,19 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 `src/lib/geojson.test.ts`: covers `Sample.geojson` (6 boxes, 6 legacy notes, Box 91B's note is intact), a non-Point feature that gets skipped, bad coordinates, and garbage input.
 
 **Done when:** `npm test` passes.
+
+---
+
 ## M3: Collection picker ("Splash screen" in SRS) + delete
 
 - `src/app/index.tsx`: `FlatList` of collections (name and box count). Tapping one goes to `/collection/[id]`.
 - **Import collection** button: `DocumentPicker.getDocumentAsync({ type: ['application/geo+json', 'application/json', '*/*'] })`, read with the `expo-file-system` `File` API (part of `expo`), name defaults to the file name. Collections are **not renameable** (by design).
 - Empty state text. On parse error: an `Alert` with the message, and nothing is written.
 - **Delete collection**: a trash button on each row (`accessibilityLabel="Delete <name>"`, at least 48dp).
-  - `Alert`: "Delete *South Loop*? This removes 6 boxes and 14 notes from this phone." with **Cancel** and **Delete** (destructive). M8 adds **Export first**.
+  - `Alert`: "Delete _South Loop_? This removes 6 boxes and 14 notes from this phone." with **Cancel** and **Delete** (destructive). M8 adds **Export first**.
   - `src/lib/permissions.ts`: `canDelete(user, record): boolean`. v1 rule: `user.role === 'admin' || record.created_by === user.id`. With the v1 local user this always returns true, and it is already the v2 rule.
   - `src/db/collections.ts`: `deleteCollection(db, user, id)` throws if `!canDelete`, then in one `withTransactionAsync` sets `deleted_at = updated_at = now` and `sync_status = 'pending'` on the collection, its boxes and their observations.
-  `ponytail:` soft-deleted rows stay in the DB forever. Upgrade path: a hard purge after v2 sync confirms the delete.
+    `ponytail:` soft-deleted rows stay in the DB forever. Upgrade path: a hard purge after v2 sync confirms the delete.
 - Test: `permissions.test.ts` covers admin, owner birder and non-owner birder.
 
 **Done when:** importing `Sample.geojson` lists a collection with 6 boxes and it survives a restart. A bad file shows an error without crashing. Delete → confirm removes the row and it stays gone after a restart. Cancel keeps it. Re-importing the same file after deleting works.
@@ -88,6 +93,7 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 - `src/app/collection/[id].tsx`: `react-native-maps` `MapView` with `showsUserLocation` and `showsMyLocationButton`, one `Marker` per box, `fitToCoordinates` on load.
 - `expo-location` `requestForegroundPermissionsAsync`. If denied, the map still works and shows a small banner.
 - Tapping a marker goes to `/box/[id]`.
+- An **Add box** button is reserved in the UI (grayed out) for v2 — the backend insert function `addBox` is written in `src/db/boxes.ts` now so it's ready.
 - Offline: pins and GPS work without signal. Base-map tiles only show areas already cached, so open each collection on Wi-Fi before fieldwork. Put this note in the README.
 
 **Done when:** the 6 sample pins appear near the right places in Idaho, the blue dot shows, and the screen works in airplane mode.
@@ -96,7 +102,7 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 
 ## M5: Nest box bottom sheet & Navigate
 
-- `src/app/box/[id].tsx` registered with `presentation: 'formSheet'`, `sheetAllowedDetents: [0.5, 1]`, `sheetGrabberVisible: true` (native Expo Router, no library). The title is rendered in the content because Android sheets have no header.
+- `src/app/box/[id].tsx` registered with `presentation: 'formSheet'`, `sheetAllowedDetents: [0.5, 1]`, `sheetGrabberVisible: true` (native Expo Router, no library). The title is rendered in the content because Android sheets have no header. Wrap the notes list in a `ScrollView` or `FlatList` with `nestedScrollEnabled` so scrolling long histories on Android doesn't accidentally drag or dismiss the sheet.
 - Shows the name, coordinates (6 decimals), and **Notes**, one line per observation, newest first:
   - nest: `10/21/2026 · Jane · 1 nest, 4 eggs, 0 chicks, cleaned · <notes>`
   - box: `10/21/2026 · Jane · Box gone, pole still there · <notes>`
@@ -109,6 +115,9 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 - Tests: `format.test.ts`, `maps.test.ts`.
 
 **Done when:** a pin opens the sheet and swiping down dismisses it, Navigate opens Apple Maps on iPhone and Google Maps on Android with a driving route, and tests pass.
+
+---
+
 ## M6: Observation screen & Nest Note
 
 - `src/app/box/[id]/observe.tsx`: two large buttons, **Box present – Take New Note** and **Box missing – Take New Note**, which switch the form on the same screen (`ponytail:` no extra routes).
@@ -140,17 +149,38 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
   ```json
   {
     "type": "FeatureCollection",
-    "nestnotes": { "version": 1, "name": "South Loop", "exported_at": "2026-11-22T20:00:00.000Z" },
-    "features": [{
-      "type": "Feature",
-      "id": "<box uuid>",
-      "geometry": { "type": "Point", "coordinates": [-116.503128, 42.620495] },
-      "properties": {
-        "name": "Box 71",
-        "desc": "10/21/2026 Jane: 1 nest, 4 eggs, 0 chicks, cleaned\n10/22/2024 Imported: Cleaned box and put back on pole...",
-        "observations": [{ "id": "…", "kind": "nest", "observed_on": "2026-10-21", "inspector": "Jane", "nests": 1, "eggs": 4, "chicks": 0, "cleaned_out": true, "notes": "" }]
+    "nestnotes": {
+      "version": 1,
+      "name": "South Loop",
+      "exported_at": "2026-11-22T20:00:00.000Z"
+    },
+    "features": [
+      {
+        "type": "Feature",
+        "id": "<box uuid>",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-116.503128, 42.620495]
+        },
+        "properties": {
+          "name": "Box 71",
+          "desc": "10/21/2026 Jane: 1 nest, 4 eggs, 0 chicks, cleaned\n10/22/2024 Imported: Cleaned box and put back on pole...",
+          "observations": [
+            {
+              "id": "…",
+              "kind": "nest",
+              "observed_on": "2026-10-21",
+              "inspector": "Jane",
+              "nests": 1,
+              "eggs": 4,
+              "chicks": 0,
+              "cleaned_out": true,
+              "notes": ""
+            }
+          ]
+        }
       }
-    }]
+    ]
   }
   ```
   `desc` is generated with `summarize()` so the old app can still read the file. `observations` is the structured data the app re-imports.
@@ -159,7 +189,6 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 - Test: round trip, `parseCollection(toGeoJSON(...))` gives back the same boxes and observations.
 
 **Done when:** you can export a collection and email it to yourself, and importing that file on another phone shows the same pins and history. Delete → Export first opens the share sheet and deletes nothing.
----
 
 ## M9: Field-readiness polish
 
@@ -181,6 +210,7 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 
 - Accounts and admin/birder RBAC (swap the v1 local user for a real one; `canDelete` already has the rule). Hide the delete button when `!canDelete`.
 - **Master map:** admins import the legacy file, then select boxes to create Collections for birders, using the M8 export format. Birders' exports merge back by box/observation `id`.
+- **Add box on map:** place a new box by long-pressing the map (pick from dropped pin, enter name, optionally start an observation). The `addBox` DB function already exists.
 - Cloud sync (`sync_status`, `updated_at` and `deleted_at` are already in place) and a hard purge of soft-deleted rows.
 - Edit/delete observations, rename boxes (e.g. `Waypoint 10/21/26 13:25` is really Box 88), split legacy notes.
 
