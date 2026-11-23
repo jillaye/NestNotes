@@ -1,16 +1,43 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
-import type { Collection } from "@/types";
+import type { Collection, User } from "@/types";
 import type { ParsedCollection } from "@/lib/geojson";
+import { canDelete, LOCAL_USER_ID } from "@/lib/permissions";
 
-const LOCAL_USER_ID = "local";
 const now = (): string => new Date().toISOString();
 
+export interface CollectionWithCounts extends Collection {
+  box_count: number;
+  observation_count: number;
+}
+
+/**
+ * Get all active collections with their box and observation counts.
+ */
 export async function getAllCollections(
   db: SQLiteDatabase,
-): Promise<Collection[]> {
-  return db.getAllAsync<Collection>(
-    "SELECT * FROM collections WHERE deleted_at IS NULL ORDER BY created_at DESC",
+): Promise<CollectionWithCounts[]> {
+  return db.getAllAsync<CollectionWithCounts>(
+    `SELECT
+       c.*,
+       CAST(COALESCE(box_counts.cnt, 0) AS INTEGER) AS box_count,
+       CAST(COALESCE(obs_counts.cnt, 0) AS INTEGER) AS observation_count
+     FROM collections c
+     LEFT JOIN (
+       SELECT collection_id, COUNT(*) AS cnt
+       FROM nest_boxes
+       WHERE deleted_at IS NULL
+       GROUP BY collection_id
+     ) box_counts ON box_counts.collection_id = c.id
+     LEFT JOIN (
+       SELECT nb.collection_id, COUNT(*) AS cnt
+       FROM observations o
+       JOIN nest_boxes nb ON nb.id = o.nest_box_id
+       WHERE o.deleted_at IS NULL AND nb.deleted_at IS NULL
+       GROUP BY nb.collection_id
+     ) obs_counts ON obs_counts.collection_id = c.id
+     WHERE c.deleted_at IS NULL
+     ORDER BY c.created_at DESC`,
   );
 }
 
@@ -55,16 +82,59 @@ export async function updateCollection(
   );
 }
 
+/**
+ * Soft-delete a collection, all its nest boxes, and all their observations.
+ * Throws if the user does not have permission.
+ *
+ * ponytail: soft-deleted rows stay in the DB forever. Upgrade path: a hard
+ * purge after v2 sync confirms the delete.
+ */
 export async function deleteCollection(
   db: SQLiteDatabase,
+  user: User,
   id: string,
 ): Promise<void> {
-  await db.runAsync(
-    "UPDATE collections SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-    now(),
-    now(),
+  const collection = await db.getFirstAsync<Collection>(
+    "SELECT * FROM collections WHERE id = ? AND deleted_at IS NULL",
     id,
   );
+  if (!collection) return; // already gone, no-op
+
+  if (!canDelete(user, collection)) {
+    throw new Error("You don't have permission to delete this collection.");
+  }
+
+  const ts = now();
+
+  await db.withTransactionAsync(async () => {
+    // Soft-delete the collection
+    await db.runAsync(
+      "UPDATE collections SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ?",
+      ts,
+      ts,
+      id,
+    );
+
+    // Soft-delete all its boxes
+    await db.runAsync(
+      "UPDATE nest_boxes SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE collection_id = ? AND deleted_at IS NULL",
+      ts,
+      ts,
+      id,
+    );
+
+    // Soft-delete all observations on those boxes
+    await db.runAsync(
+      `UPDATE observations SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
+       WHERE nest_box_id IN (
+         SELECT id FROM nest_boxes WHERE collection_id = ? AND deleted_at = ?
+       )`,
+      ts,
+      ts,
+      id,
+      ts,
+    );
+  });
 }
 
 /**
