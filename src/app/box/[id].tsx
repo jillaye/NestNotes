@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
-import { Stack, useLocalSearchParams, router } from "expo-router";
+import { Stack, useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { getBoxById } from "@/db/boxes";
 import { getObservationsByBox } from "@/db/observations";
@@ -25,16 +25,22 @@ export default function BoxSheet() {
   const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load box on mount (doesn't change)
   useEffect(() => {
     if (!id) return;
-    Promise.all([getBoxById(db, id), getObservationsByBox(db, id)]).then(
-      ([b, obs]) => {
-        setBox(b);
-        setObservations(obs);
-        setLoading(false);
-      },
-    );
+    getBoxById(db, id).then((b) => {
+      setBox(b);
+      setLoading(false);
+    });
   }, [db, id]);
+
+  // Refresh observations every time the screen gains focus (e.g. after saving)
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return;
+      getObservationsByBox(db, id).then(setObservations);
+    }, [db, id]),
+  );
 
   const handleNavigate = useCallback(() => {
     if (!box) return;
@@ -79,9 +85,7 @@ export default function BoxSheet() {
       {/* Title rendered in content because Android sheets have no header */}
       <Stack.Screen
         options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.5, 1],
-          sheetGrabberVisible: true,
+          title: box.name,
         }}
       />
 
