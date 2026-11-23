@@ -19,10 +19,10 @@ Every milestone ends with **Done when** checks plus `npx expo lint` and `npx tsc
 ## M0: Project prep
 
 - [x] `expo-crypto`, `expo-document-picker`, `expo-sharing` installed.
-- [ ] `app.json`: add the `expo-location` plugin with `locationWhenInUsePermission: "Shows your position relative to nest boxes."`
-- [ ] `npx expo lint` once to generate the ESLint config.
-- [ ] `package.json` script: `"test": "node --test src/lib"`. Prove it works with a trivial test. If `tsc` rejects `.ts` import extensions in tests, add `"allowImportingTsExtensions": true` to `tsconfig.json` (valid because Expo uses `noEmit`).
-- [ ] Delete the starter text in `src/app/index.tsx`.
+- [x] `app.json`: add the `expo-location` plugin with `locationWhenInUsePermission: "Shows your position relative to nest boxes."`
+- [x] `npx expo lint` once to generate the ESLint config.
+- [x] `package.json` script: `"test": "node --test src/lib"`. Prove it works with a trivial test. If `tsc` rejects `.ts` import extensions in tests, add `"allowImportingTsExtensions": true` to `tsconfig.json` (valid because Expo uses `noEmit`).
+- [x] Delete the starter text in `src/app/index.tsx`.
 
 **Done when:** `npx expo-doctor` is clean, the app boots in Expo Go on Android and iPhone, and `npm test`, lint and typecheck pass.
 

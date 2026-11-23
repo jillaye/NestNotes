@@ -34,7 +34,13 @@
         }
       ],
       "expo-sqlite",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Shows your position relative to nest boxes."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
