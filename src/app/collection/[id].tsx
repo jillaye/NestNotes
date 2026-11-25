@@ -57,13 +57,13 @@ export default function CollectionMap() {
       !isFittedRef.current &&
       mapRef.current
     ) {
-      isFittedRef.current = true;
       const coords = boxes.map((b) => ({
         latitude: b.latitude,
         longitude: b.longitude,
       }));
       // Small delay to let the native map engine initialise
       const timer = setTimeout(() => {
+        isFittedRef.current = true;
         mapRef.current?.fitToCoordinates(coords, {
           edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
           animated: true,

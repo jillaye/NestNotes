@@ -170,18 +170,42 @@ function parseNestNotesObservations(
     .filter(
       (o): o is Record<string, unknown> => o != null && typeof o === "object",
     )
-    .map((o) => ({
-      kind: (["nest", "box", "legacy"].includes(String(o.kind))
+    .map((o) => {
+      const kind = (["nest", "box", "legacy"].includes(String(o.kind))
         ? String(o.kind)
-        : "legacy") as "nest" | "box" | "legacy",
-      observed_on: String(o.observed_on ?? ""),
-      inspector: String(o.inspector ?? "Imported"),
-      nests: safeNumber(o.nests),
-      eggs: safeNumber(o.eggs),
-      chicks: safeNumber(o.chicks),
-      cleaned_out: Boolean(o.cleaned_out),
-      notes: String(o.notes ?? ""),
-    }));
+        : "legacy") as "nest" | "box" | "legacy";
+
+      // Validate observed_on; fall back to today if missing or malformed
+      const rawDate = String(o.observed_on ?? "");
+      const observed_on = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+        ? rawDate
+        : todayLocal();
+
+      const nests = safeNumber(o.nests);
+      const eggs = safeNumber(o.eggs);
+      const chicks = safeNumber(o.chicks);
+
+      return {
+        kind,
+        observed_on,
+        inspector: String(o.inspector ?? "Imported"),
+        // Ensure nest kind always has a numeric value for nests
+        nests: kind === "nest" && nests === null ? 0 : nests,
+        eggs,
+        chicks,
+        cleaned_out: Boolean(o.cleaned_out),
+        notes: String(o.notes ?? ""),
+      };
+    });
+}
+
+/** Return today's date as YYYY-MM-DD. */
+function todayLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function parseLegacyObservations(
@@ -193,14 +217,6 @@ function parseLegacyObservations(
       : "";
 
   if (!desc) return [];
-
-  const todayLocal = (): string => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
 
   let observed_on: string;
   if (typeof props.time === "string") {

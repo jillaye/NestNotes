@@ -107,9 +107,14 @@ export async function deleteCollection(
   const ts = now();
 
   await db.withTransactionAsync(async () => {
-    // Soft-delete the collection
+    // Soft-delete all observations on this collection's boxes first,
+    // before the boxes themselves are soft-deleted (the subquery needs
+    // to find them).
     await db.runAsync(
-      "UPDATE collections SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ?",
+      `UPDATE observations SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
+       WHERE nest_box_id IN (
+         SELECT id FROM nest_boxes WHERE collection_id = ? AND deleted_at IS NULL
+       )`,
       ts,
       ts,
       id,
@@ -123,12 +128,9 @@ export async function deleteCollection(
       id,
     );
 
-    // Soft-delete all currently active observations on those boxes
+    // Soft-delete the collection
     await db.runAsync(
-      `UPDATE observations SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
-       WHERE nest_box_id IN (
-         SELECT id FROM nest_boxes WHERE collection_id = ? AND deleted_at IS NULL
-       )`,
+      "UPDATE collections SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ?",
       ts,
       ts,
       id,

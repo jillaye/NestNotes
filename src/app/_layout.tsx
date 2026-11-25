@@ -11,8 +11,9 @@ export default function RootLayout() {
           options={{
             presentation: "formSheet",
             sheetAllowedDetents: [0.5, 1],
-            sheetInitialDetentIndex: 1,
+            sheetInitialDetentIndex: 0,
             sheetGrabberVisible: true,
+            headerShown: false,
           }}
         />
         <Stack.Screen
