@@ -32,6 +32,11 @@ export default function Stepper({
 
   const handleTextChange = useCallback(
     (text: string) => {
+      // Allow clearing the field (reset to min)
+      if (text === "") {
+        onChange(min);
+        return;
+      }
       const parsed = parseInt(text, 10);
       if (!isNaN(parsed) && parsed >= min) {
         onChange(parsed);

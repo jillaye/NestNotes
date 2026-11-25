@@ -13,7 +13,7 @@ export function toMDY(isoDate: string): string {
  * Returns null for invalid dates including impossible month/day combos.
  */
 export function parseMDY(text: string): string | null {
-  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const match = text.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!match) return null;
 
   const month = parseInt(match[1], 10);

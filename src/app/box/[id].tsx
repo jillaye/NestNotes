@@ -1,21 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Pressable,
-  Linking,
-  ActivityIndicator,
-  Platform,
-} from "react-native";
-import { Stack, useLocalSearchParams, router, useFocusEffect } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
 import { getBoxById } from "@/db/boxes";
 import { getObservationsByBox } from "@/db/observations";
-import { toMDY, summarize } from "@/lib/format";
+import { summarize, toMDY } from "@/lib/format";
 import { directionsUrl } from "@/lib/maps";
 import type { NestBox, Observation } from "@/types";
+import {
+  router,
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+} from "expo-router";
+import { useSQLiteContext } from "expo-sqlite";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 export default function BoxSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,10 +34,12 @@ export default function BoxSheet() {
   // Load box on mount (doesn't change)
   useEffect(() => {
     if (!id) return;
-    getBoxById(db, id).then((b) => {
-      setBox(b);
-      setLoading(false);
-    });
+    getBoxById(db, id)
+      .then((b) => {
+        setBox(b);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [db, id]);
 
   // Refresh observations every time the screen gains focus (e.g. after saving)
@@ -44,25 +52,28 @@ export default function BoxSheet() {
 
   const handleNavigate = useCallback(() => {
     if (!box) return;
-    const url = directionsUrl(box.latitude, box.longitude, Platform.OS as "ios" | "android");
-    Linking.openURL(url);
+    const url = directionsUrl(
+      box.latitude,
+      box.longitude,
+      Platform.OS as "ios" | "android",
+    );
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Navigation Error", "Could not open the maps app.");
+    });
   }, [box]);
 
   const handleNewObservation = useCallback(() => {
     router.push(`/box/${id}/observe` as unknown as never);
   }, [id]);
 
-  const renderObservation = useCallback(
-    ({ item }: { item: Observation }) => {
-      const summary = summarize(item);
-      const parts = [`${toMDY(item.observed_on)} · ${item.inspector}`];
-      if (summary) parts.push(summary);
-      if (item.notes) parts.push(item.notes);
+  const renderObservation = useCallback(({ item }: { item: Observation }) => {
+    const summary = summarize(item);
+    const parts = [`${toMDY(item.observed_on)} · ${item.inspector}`];
+    if (summary) parts.push(summary);
+    if (item.notes) parts.push(item.notes);
 
-      return <Text style={styles.noteLine}>{parts.join(" · ")}</Text>;
-    },
-    [],
-  );
+    return <Text style={styles.noteLine}>{parts.join(" · ")}</Text>;
+  }, []);
 
   if (loading) {
     return (

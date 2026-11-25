@@ -6,8 +6,7 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
   );
   const version = row?.user_version ?? 0;
 
-  if (version >= 2) return;
-
+  // PRAGMAs must run on every connection (not persisted in the DB file)
   await db.execAsync("PRAGMA journal_mode = WAL");
   await db.execAsync("PRAGMA foreign_keys = ON");
 
@@ -63,8 +62,21 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
   }
 
   // v2: app_state key-value store
-  await db.execAsync(
-    `CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)`,
-  );
-  await db.execAsync("PRAGMA user_version = 2");
+  if (version < 2) {
+    await db.execAsync(
+      `CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)`,
+    );
+    await db.execAsync("PRAGMA user_version = 2");
+  }
+
+  // v3: indexes for box & observation lookups (M1 requirement)
+  if (version < 3) {
+    await db.execAsync(
+      "CREATE INDEX IF NOT EXISTS idx_nest_boxes_collection_id ON nest_boxes(collection_id)",
+    );
+    await db.execAsync(
+      "CREATE INDEX IF NOT EXISTS idx_observations_nest_box_id ON observations(nest_box_id)",
+    );
+    await db.execAsync("PRAGMA user_version = 3");
+  }
 }

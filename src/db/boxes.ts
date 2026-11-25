@@ -1,8 +1,8 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
-import type { NestBox } from "@/types";
+import type { NestBox, User } from "@/types";
+import { canDelete, LOCAL_USER_ID } from "@/lib/permissions";
 
-const LOCAL_USER_ID = "local";
 const now = (): string => new Date().toISOString();
 
 export async function getBoxesByCollection(
@@ -88,7 +88,7 @@ export async function updateBox(
 
   if (fields.length === 0) return;
 
-  fields.push("updated_at = ?");
+  fields.push("updated_at = ?", "sync_status = 'pending'");
   values.push(now());
   values.push(id);
 
@@ -98,14 +98,44 @@ export async function updateBox(
   );
 }
 
+/**
+ * Soft-delete a box and all its observations.
+ * Throws if the user does not have permission.
+ *
+ * ponytail: runs in a transaction to keep box + observations atomic.
+ */
 export async function deleteBox(
   db: SQLiteDatabase,
+  user: User,
   id: string,
 ): Promise<void> {
-  await db.runAsync(
-    "UPDATE nest_boxes SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-    now(),
-    now(),
+  const row = await db.getFirstAsync<{ created_by: string }>(
+    "SELECT created_by FROM nest_boxes WHERE id = ? AND deleted_at IS NULL",
     id,
   );
+  if (!row) return;
+
+  if (!canDelete(user, row)) {
+    throw new Error("You don't have permission to delete this box.");
+  }
+
+  const ts = now();
+
+  await db.withTransactionAsync(async () => {
+    // Soft-delete observations on this box
+    await db.runAsync(
+      "UPDATE observations SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE nest_box_id = ? AND deleted_at IS NULL",
+      ts,
+      ts,
+      id,
+    );
+
+    // Soft-delete the box itself
+    await db.runAsync(
+      "UPDATE nest_boxes SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at IS NULL",
+      ts,
+      ts,
+      id,
+    );
+  });
 }

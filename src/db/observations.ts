@@ -1,8 +1,8 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
-import type { Observation, ObservationKind } from "@/types";
+import type { Observation, ObservationKind, User } from "@/types";
+import { canDelete, LOCAL_USER_ID } from "@/lib/permissions";
 
-const LOCAL_USER_ID = "local";
 const now = (): string => new Date().toISOString();
 
 export interface AddObservationInput {
@@ -57,7 +57,7 @@ export async function getObservationsByBox(
   nestBoxId: string,
 ): Promise<Observation[]> {
   const rows = await db.getAllAsync<Record<string, unknown>>(
-    "SELECT * FROM observations WHERE nest_box_id = ? AND deleted_at IS NULL ORDER BY observed_on DESC",
+    "SELECT * FROM observations WHERE nest_box_id = ? AND deleted_at IS NULL ORDER BY observed_on DESC, updated_at DESC",
     nestBoxId,
   );
   return rows.map(hydrateObservation);
@@ -74,14 +74,30 @@ export async function getObservationById(
   return row ? hydrateObservation(row) : null;
 }
 
+/**
+ * Soft-delete an observation.
+ * Throws if the user does not have permission.
+ */
 export async function deleteObservation(
   db: SQLiteDatabase,
+  user: User,
   id: string,
 ): Promise<void> {
+  const row = await db.getFirstAsync<{ created_by: string }>(
+    "SELECT created_by FROM observations WHERE id = ? AND deleted_at IS NULL",
+    id,
+  );
+  if (!row) return;
+
+  if (!canDelete(user, row)) {
+    throw new Error("You don't have permission to delete this observation.");
+  }
+
+  const ts = now();
   await db.runAsync(
-    "UPDATE observations SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-    now(),
-    now(),
+    "UPDATE observations SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at IS NULL",
+    ts,
+    ts,
     id,
   );
 }

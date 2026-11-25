@@ -75,7 +75,7 @@ export async function updateCollection(
   name: string,
 ): Promise<void> {
   await db.runAsync(
-    "UPDATE collections SET name = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+    "UPDATE collections SET name = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at IS NULL",
     name,
     now(),
     id,
@@ -123,16 +123,15 @@ export async function deleteCollection(
       id,
     );
 
-    // Soft-delete all observations on those boxes
+    // Soft-delete all currently active observations on those boxes
     await db.runAsync(
       `UPDATE observations SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
        WHERE nest_box_id IN (
-         SELECT id FROM nest_boxes WHERE collection_id = ? AND deleted_at = ?
+         SELECT id FROM nest_boxes WHERE collection_id = ? AND deleted_at IS NULL
        )`,
       ts,
       ts,
       id,
-      ts,
     );
   });
 }

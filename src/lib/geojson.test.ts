@@ -1,15 +1,10 @@
-import { describe, it } from "node:test";
 import assert from "node:assert";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { describe, it } from "node:test";
 import { parseCollection } from "./geojson.ts";
 
-const samplePath = join(
-  import.meta.dirname,
-  "..",
-  "..",
-  "Sample.geojson",
-);
+const samplePath = join(import.meta.dirname, "..", "..", "Sample.geojson");
 
 describe("parseCollection", () => {
   it("parses Sample.geojson: 6 boxes, 6 legacy observations, Box 91B note intact", () => {
@@ -43,9 +38,7 @@ describe("parseCollection", () => {
     assert(box91b);
     assert(box91b.observations[0].notes.includes("10/22/24"));
     assert(box91b.observations[0].notes.includes("10/21/26 box full"));
-    assert(
-      box91b.observations[0].notes.includes("Survived Big Grassy Fire"),
-    );
+    assert(box91b.observations[0].notes.includes("Survived Big Grassy Fire"));
   });
 
   it("skips non-Point features", () => {
@@ -62,7 +55,15 @@ describe("parseCollection", () => {
           properties: { name: "A polygon" },
           geometry: {
             type: "Polygon",
-            coordinates: [[[-116.5, 42.6], [-116.4, 42.6], [-116.4, 42.7], [-116.5, 42.7], [-116.5, 42.6]]],
+            coordinates: [
+              [
+                [-116.5, 42.6],
+                [-116.4, 42.6],
+                [-116.4, 42.7],
+                [-116.5, 42.7],
+                [-116.5, 42.6],
+              ],
+            ],
           },
         },
         {
@@ -70,7 +71,10 @@ describe("parseCollection", () => {
           properties: { name: "A linestring" },
           geometry: {
             type: "LineString",
-            coordinates: [[-116.5, 42.6], [-116.4, 42.7]],
+            coordinates: [
+              [-116.5, 42.6],
+              [-116.4, 42.7],
+            ],
           },
         },
       ],
@@ -118,12 +122,18 @@ describe("parseCollection", () => {
   });
 
   it("throws on non-object JSON", () => {
-    assert.throws(() => parseCollection('"a string"'), /expected a JSON object/);
+    assert.throws(
+      () => parseCollection('"a string"'),
+      /expected a JSON object/,
+    );
   });
 
   it("throws on wrong top-level type", () => {
     const text = JSON.stringify({ type: "Feature", geometry: null });
-    assert.throws(() => parseCollection(text), /expected type "FeatureCollection"/);
+    assert.throws(
+      () => parseCollection(text),
+      /expected type "FeatureCollection"/,
+    );
   });
 
   it("skips non-Feature items in features array", () => {
@@ -238,7 +248,8 @@ describe("parseCollection", () => {
     });
 
     const result = parseCollection(text);
-    const today = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     assert.strictEqual(result.boxes[0].observations[0].observed_on, today);
   });
 

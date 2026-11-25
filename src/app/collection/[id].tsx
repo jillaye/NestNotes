@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-} from "react-native";
-import { Stack, useLocalSearchParams, router } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
-import MapView, { Marker } from "react-native-maps";
-import * as Location from "expo-location";
 import { getBoxesByCollection } from "@/db/boxes";
 import { getCollectionById } from "@/db/collections";
-import type { NestBox, Collection } from "@/types";
+import type { Collection, NestBox } from "@/types";
+import * as Location from "expo-location";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useSQLiteContext } from "expo-sqlite";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import MapView, { Marker } from "react-native-maps";
 
 export default function CollectionMap() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,14 +29,13 @@ export default function CollectionMap() {
   // Load collection and boxes from DB
   useEffect(() => {
     if (!id) return;
-    Promise.all([
-      getCollectionById(db, id),
-      getBoxesByCollection(db, id),
-    ]).then(([col, bxs]) => {
-      setCollection(col);
-      setBoxes(bxs);
-      setLoading(false);
-    });
+    Promise.all([getCollectionById(db, id), getBoxesByCollection(db, id)])
+      .then(([col, bxs]) => {
+        setCollection(col);
+        setBoxes(bxs);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [db, id]);
 
   // Header title set via Stack.Screen below
@@ -114,9 +113,7 @@ export default function CollectionMap() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{ title: collection?.name ?? "Collection" }}
-      />
+      <Stack.Screen options={{ title: collection?.name ?? "Collection" }} />
 
       {locationDenied && (
         <View style={styles.banner}>

@@ -19,6 +19,12 @@ export interface ParsedBox {
   observations: ParsedObservation[];
 }
 
+function safeNumber(v: unknown): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
 /** The result of parsing a GeoJSON file for import. */
 export interface ParsedCollection {
   name?: string;
@@ -58,9 +64,7 @@ export function parseCollection(text: string): ParsedCollection {
     (nestnotes as Record<string, unknown>).version === 1;
 
   if (root.type !== "FeatureCollection") {
-    throw new Error(
-      'Invalid GeoJSON: expected type "FeatureCollection".',
-    );
+    throw new Error('Invalid GeoJSON: expected type "FeatureCollection".');
   }
 
   const features = root.features;
@@ -125,10 +129,16 @@ export function parseCollection(text: string): ParsedCollection {
 
     if (isNestNotes) {
       observations = parseNestNotesObservations(props);
-      properties_json = stringifyExtraProps(props, new Set(["name", "desc", "observations", "time"]));
+      properties_json = stringifyExtraProps(
+        props,
+        new Set(["name", "desc", "observations"]),
+      );
     } else {
       observations = parseLegacyObservations(props);
-      properties_json = stringifyExtraProps(props, new Set(["name", "desc", "time"]));
+      properties_json = stringifyExtraProps(
+        props,
+        new Set(["name", "desc", "time"]),
+      );
     }
 
     boxes.push({
@@ -150,25 +160,33 @@ export function parseCollection(text: string): ParsedCollection {
   return { name, boxes, skipped };
 }
 
-function parseNestNotesObservations(props: Record<string, unknown>): ParsedObservation[] {
+function parseNestNotesObservations(
+  props: Record<string, unknown>,
+): ParsedObservation[] {
   const rawObs = props.observations;
   if (!Array.isArray(rawObs)) return [];
 
-  return rawObs.map((o: Record<string, unknown>) => ({
-    kind: (["nest", "box", "legacy"].includes(String(o.kind))
-      ? String(o.kind)
-      : "legacy") as "nest" | "box" | "legacy",
-    observed_on: String(o.observed_on ?? ""),
-    inspector: String(o.inspector ?? "Imported"),
-    nests: o.nests != null ? Number(o.nests) : null,
-    eggs: o.eggs != null ? Number(o.eggs) : null,
-    chicks: o.chicks != null ? Number(o.chicks) : null,
-    cleaned_out: Boolean(o.cleaned_out),
-    notes: String(o.notes ?? ""),
-  }));
+  return rawObs
+    .filter(
+      (o): o is Record<string, unknown> => o != null && typeof o === "object",
+    )
+    .map((o) => ({
+      kind: (["nest", "box", "legacy"].includes(String(o.kind))
+        ? String(o.kind)
+        : "legacy") as "nest" | "box" | "legacy",
+      observed_on: String(o.observed_on ?? ""),
+      inspector: String(o.inspector ?? "Imported"),
+      nests: safeNumber(o.nests),
+      eggs: safeNumber(o.eggs),
+      chicks: safeNumber(o.chicks),
+      cleaned_out: Boolean(o.cleaned_out),
+      notes: String(o.notes ?? ""),
+    }));
 }
 
-function parseLegacyObservations(props: Record<string, unknown>): ParsedObservation[] {
+function parseLegacyObservations(
+  props: Record<string, unknown>,
+): ParsedObservation[] {
   const desc =
     typeof props.desc === "string" && props.desc.trim()
       ? props.desc.trim()
@@ -176,12 +194,20 @@ function parseLegacyObservations(props: Record<string, unknown>): ParsedObservat
 
   if (!desc) return [];
 
+  const todayLocal = (): string => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
   let observed_on: string;
   if (typeof props.time === "string") {
     const match = (props.time as string).match(/^(\d{4}-\d{2}-\d{2})/);
-    observed_on = match ? match[1] : new Date().toISOString().slice(0, 10);
+    observed_on = match ? match[1] : todayLocal();
   } else {
-    observed_on = new Date().toISOString().slice(0, 10);
+    observed_on = todayLocal();
   }
 
   return [

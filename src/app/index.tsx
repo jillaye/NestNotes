@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   FlatList,
   Text,
@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { router } from "expo-router";
+import { router, Stack, useFocusEffect } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -26,11 +26,13 @@ export default function CollectionPicker() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
 
-  useEffect(() => {
-    getAllCollections(db)
-      .then(setCollections)
-      .finally(() => setLoading(false));
-  }, [db]);
+  useFocusEffect(
+    useCallback(() => {
+      getAllCollections(db)
+        .then(setCollections)
+        .finally(() => setLoading(false));
+    }, [db]),
+  );
 
   const refresh = useCallback(async () => {
     const data = await getAllCollections(db);
@@ -101,6 +103,7 @@ const handleDelete = useCallback(
 
   return (
     <View style={styles.container}>
+      <Stack.Screen options={{ title: "NestNotes" }} />
       <Text style={styles.title}>NestNotes</Text>
 
       {collections.length === 0 ? (
