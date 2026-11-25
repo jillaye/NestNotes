@@ -1,6 +1,6 @@
 # NestNotes — Phased Implementation Plan
 
-Source: [SRS.md](SRS.md) · Rules: [.clinerules/nestnotes.md](.clinerules/nestnotes.md), [AGENTS.md](AGENTS.md) · Expo SDK **58** (check https://docs.expo.dev/versions/v58.0.0/ before writing Expo code).
+Source: [SRS.md](SRS.md) · Rules: [.clinerules/nestnotes.md](.clinerules/nestnotes.md), [AGENTS.md](AGENTS.md), [.clinerules/ponlytail.md](.clinerules/ponlytail.md) · Expo SDK **58** (check https://docs.expo.dev/versions/v58.0.0/ before writing Expo code).
 
 Every milestone ends with **Done when** checks plus `npx expo lint` and `npx tsc --noEmit` passing.
 

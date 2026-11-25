@@ -53,6 +53,9 @@ export interface BoxObservation extends ObservationBase {
   eggs: number | null;
   chicks: number | null;
   cleaned_out: boolean;
+  box_not_found: boolean;
+  box_gone_pole_present: boolean;
+  pole_cut_down: boolean;
 }
 
 export interface LegacyObservation extends ObservationBase {

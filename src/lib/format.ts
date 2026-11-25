@@ -1,6 +1,18 @@
 import type { Observation } from "@/types";
 
 /**
+ * Ordered box-missing conditions (M7). The labels double as the summary text
+ * shown in the note list, e.g. "Box gone, pole still there".
+ */
+export const BOX_CONDITIONS = [
+  { key: "box_not_found", label: "Could not find box at all" },
+  { key: "box_gone_pole_present", label: "Box gone, pole still there" },
+  { key: "pole_cut_down", label: "Pole cut down" },
+] as const;
+
+export type BoxConditionKey = (typeof BOX_CONDITIONS)[number]["key"];
+
+/**
  * Convert an ISO date string (YYYY-MM-DD) to MM/DD/YYYY display format.
  */
 export function toMDY(isoDate: string): string {
@@ -54,6 +66,9 @@ export function summarize(obs: Observation): string {
       return parts.join(", ");
     }
     case "box":
+      return BOX_CONDITIONS.filter((c) => obs[c.key])
+        .map((c) => c.label)
+        .join(", ");
     case "legacy":
       return "";
   }

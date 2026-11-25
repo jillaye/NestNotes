@@ -2,7 +2,7 @@ import Stepper from "@/components/Stepper";
 import { getAppState, setAppState } from "@/db/app_state";
 import { getBoxById } from "@/db/boxes";
 import { addObservation } from "@/db/observations";
-import { parseMDY } from "@/lib/format";
+import { BOX_CONDITIONS, parseMDY, type BoxConditionKey } from "@/lib/format";
 import type { NestBox } from "@/types";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
@@ -43,6 +43,13 @@ export default function ObserveScreen() {
   const [eggs, setEggs] = useState(0);
   const [chicks, setChicks] = useState(0);
   const [cleanedOut, setCleanedOut] = useState(false);
+  const [conditions, setConditions] = useState<Record<BoxConditionKey, boolean>>(
+    {
+      box_not_found: false,
+      box_gone_pole_present: false,
+      pole_cut_down: false,
+    },
+  );
   const [saving, setSaving] = useState(false);
 
   // Load box + last inspector name
@@ -67,6 +74,11 @@ export default function ObserveScreen() {
     setFormKind(null);
   }, []);
 
+  // Toggle one box-missing condition
+  const toggleCondition = useCallback((key: BoxConditionKey) => {
+    setConditions((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
   // Save observation
   const handleSave = useCallback(async () => {
     Keyboard.dismiss();
@@ -84,13 +96,21 @@ export default function ObserveScreen() {
       return;
     }
 
+    const kind = formKind as FormKind;
+
+    if (kind === "box" && !BOX_CONDITIONS.some((c) => conditions[c.key])) {
+      Alert.alert(
+        "Missing Box Condition",
+        "Select at least one box condition.",
+      );
+      return;
+    }
+
     if (!id || !box) return;
 
     setSaving(true);
     try {
       await setAppState(db, "lastInspector", inspector.trim());
-
-      const kind = formKind as FormKind;
 
       await addObservation(db, {
         nest_box_id: id,
@@ -101,6 +121,10 @@ export default function ObserveScreen() {
         eggs: kind === "nest" ? eggs : null,
         chicks: kind === "nest" ? chicks : null,
         cleaned_out: kind === "nest" ? cleanedOut : false,
+        box_not_found: kind === "box" ? conditions.box_not_found : false,
+        box_gone_pole_present:
+          kind === "box" ? conditions.box_gone_pole_present : false,
+        pole_cut_down: kind === "box" ? conditions.pole_cut_down : false,
         notes: notes.trim(),
       });
 
@@ -121,6 +145,7 @@ export default function ObserveScreen() {
     eggs,
     chicks,
     cleanedOut,
+    conditions,
     formKind,
     id,
     box,
@@ -244,6 +269,32 @@ export default function ObserveScreen() {
             </>
           )}
 
+          {!isNest && (
+            <>
+              <Text style={styles.fieldLabel}>Box condition</Text>
+              {BOX_CONDITIONS.map((cond) => {
+                const checked = conditions[cond.key];
+                return (
+                  <Pressable
+                    key={cond.key}
+                    style={styles.checkboxRow}
+                    onPress={() => toggleCondition(cond.key)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked }}
+                    accessibilityLabel={cond.label}
+                  >
+                    <View
+                      style={[styles.checkbox, checked && styles.checkboxChecked]}
+                    >
+                      {checked && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkboxLabel}>{cond.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </>
+          )}
+
           <Text style={styles.fieldLabel}>Notes</Text>
           <TextInput
             style={[styles.textInput, styles.notesInput]}
@@ -346,6 +397,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: 48,
     marginBottom: 16,
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 48,
+    marginBottom: 12,
+    gap: 12,
+  },
+  checkbox: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#007AFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: "#007AFF",
+  },
+  checkmark: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
   },
   saveButton: {
     backgroundColor: "#34C759",

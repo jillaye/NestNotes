@@ -14,6 +14,9 @@ export interface AddObservationInput {
   eggs: number | null;
   chicks: number | null;
   cleaned_out: boolean;
+  box_not_found: boolean;
+  box_gone_pole_present: boolean;
+  pole_cut_down: boolean;
   notes: string;
 }
 
@@ -24,8 +27,8 @@ export async function addObservation(
   const id = randomUUID();
   const ts = now();
   await db.runAsync(
-    `INSERT INTO observations (id, nest_box_id, kind, observed_on, inspector, nests, eggs, chicks, cleaned_out, notes, created_by, updated_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    `INSERT INTO observations (id, nest_box_id, kind, observed_on, inspector, nests, eggs, chicks, cleaned_out, box_not_found, box_gone_pole_present, pole_cut_down, notes, created_by, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     id,
     input.nest_box_id,
     input.kind,
@@ -35,6 +38,9 @@ export async function addObservation(
     input.eggs,
     input.chicks,
     input.cleaned_out ? 1 : 0,
+    input.box_not_found ? 1 : 0,
+    input.box_gone_pole_present ? 1 : 0,
+    input.pole_cut_down ? 1 : 0,
     input.notes,
     LOCAL_USER_ID,
     ts,
@@ -49,6 +55,9 @@ function hydrateObservation(row: Record<string, unknown>): Observation {
     eggs: row.eggs ?? null,
     chicks: row.chicks ?? null,
     cleaned_out: Boolean(row.cleaned_out),
+    box_not_found: Boolean(row.box_not_found),
+    box_gone_pole_present: Boolean(row.box_gone_pole_present),
+    pole_cut_down: Boolean(row.pole_cut_down),
   } as unknown as Observation;
 }
 

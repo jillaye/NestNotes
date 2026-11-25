@@ -116,6 +116,9 @@ function makeBoxObs(
     eggs: null,
     chicks: null,
     cleaned_out: false,
+    box_not_found: false,
+    box_gone_pole_present: false,
+    pole_cut_down: false,
     notes: "Box gone, pole still there",
     created_by: "local",
     updated_at: "2026-10-21T12:00:00.000Z",
@@ -178,7 +181,20 @@ describe("summarize", () => {
     assert.strictEqual(summarize(obs), "1 nest, cleaned");
   });
 
-  it("box: returns empty string", () => {
+  it("box: summarizes a single condition", () => {
+    const obs = makeBoxObs({ box_gone_pole_present: true });
+    assert.strictEqual(summarize(obs), "Box gone, pole still there");
+  });
+
+  it("box: joins multiple conditions in display order", () => {
+    const obs = makeBoxObs({ box_not_found: true, pole_cut_down: true });
+    assert.strictEqual(
+      summarize(obs),
+      "Could not find box at all, Pole cut down",
+    );
+  });
+
+  it("box: returns empty string when no condition is set", () => {
     const obs = makeBoxObs();
     assert.strictEqual(summarize(obs), "");
   });
