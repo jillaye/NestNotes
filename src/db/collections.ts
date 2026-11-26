@@ -1,7 +1,11 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { getBoxesByCollection } from "@/db/boxes";
+import { getObservationsByCollection } from "@/db/observations";
 import type { Collection, User } from "@/types";
-import type { ParsedCollection } from "@/lib/geojson";
+import { toGeoJSON, type ParsedCollection } from "@/lib/geojson";
 import { canDelete, LOCAL_USER_ID } from "@/lib/permissions";
 
 const now = (): string => new Date().toISOString();
@@ -180,8 +184,8 @@ export async function importCollection(
       for (const obs of box.observations) {
         const obsId = randomUUID();
         await db.runAsync(
-          `INSERT INTO observations (id, nest_box_id, kind, observed_on, inspector, nests, eggs, chicks, cleaned_out, notes, created_by, updated_at, sync_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+          `INSERT INTO observations (id, nest_box_id, kind, observed_on, inspector, nests, eggs, chicks, cleaned_out, box_not_found, box_gone_pole_present, pole_cut_down, notes, created_by, updated_at, sync_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
           obsId,
           boxId,
           obs.kind,
@@ -191,6 +195,9 @@ export async function importCollection(
           obs.eggs,
           obs.chicks,
           obs.cleaned_out ? 1 : 0,
+          obs.box_not_found ? 1 : 0,
+          obs.box_gone_pole_present ? 1 : 0,
+          obs.pole_cut_down ? 1 : 0,
           obs.notes,
           LOCAL_USER_ID,
           ts,
@@ -200,4 +207,42 @@ export async function importCollection(
   });
 
   return collectionId;
+}
+
+/**
+ * Export a collection to `<name>-<YYYY-MM-DD>.geojson` in the cache directory
+ * and open the system share sheet. Throws a readable error if sharing is
+ * unavailable or the file cannot be written.
+ *
+ * ponytail: the file is left in the cache directory for the OS to reclaim.
+ * Add explicit cleanup only if stale exports ever become a problem.
+ */
+export async function exportCollection(
+  db: SQLiteDatabase,
+  collection: Collection,
+): Promise<void> {
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error("Sharing isn't available on this device.");
+  }
+
+  const [boxes, observations] = await Promise.all([
+    getBoxesByCollection(db, collection.id),
+    getObservationsByCollection(db, collection.id),
+  ]);
+
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // ponytail: strip path-illegal characters instead of slugifying the name —
+  // the field team recognises "South Loop", not "south-loop".
+  const safeName = collection.name.replace(/[\\/:*?"<>|]/g, "-");
+
+  const file = new File(Paths.cache, `${safeName}-${stamp}.geojson`);
+  file.create({ overwrite: true });
+  await file.write(toGeoJSON(collection, boxes, observations));
+
+  await Sharing.shareAsync(file.uri, {
+    mimeType: "application/geo+json",
+    UTI: "public.json",
+    dialogTitle: "Export collection",
+  });
 }

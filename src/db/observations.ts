@@ -72,6 +72,21 @@ export async function getObservationsByBox(
   return rows.map(hydrateObservation);
 }
 
+/** All active observations for a collection, across all its boxes (M8 export). */
+export async function getObservationsByCollection(
+  db: SQLiteDatabase,
+  collectionId: string,
+): Promise<Observation[]> {
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `SELECT o.* FROM observations o
+     JOIN nest_boxes nb ON nb.id = o.nest_box_id
+     WHERE nb.collection_id = ? AND o.deleted_at IS NULL AND nb.deleted_at IS NULL
+     ORDER BY o.observed_on DESC, o.updated_at DESC`,
+    collectionId,
+  );
+  return rows.map(hydrateObservation);
+}
+
 export async function getObservationById(
   db: SQLiteDatabase,
   id: string,

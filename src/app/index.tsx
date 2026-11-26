@@ -1,6 +1,7 @@
 import type { CollectionWithCounts } from "@/db/collections";
 import {
   deleteCollection,
+  exportCollection,
   getAllCollections,
   importCollection,
 } from "@/db/collections";
@@ -87,6 +88,20 @@ export default function CollectionPicker() {
         `Delete "${collection.name}"? This removes ${collection.box_count} ${nounBox} and ${collection.observation_count} ${nounObs} from this phone.`,
         [
           { text: "Cancel", style: "cancel", isPreferred: true },
+          {
+            text: "Export first",
+            onPress: async () => {
+              try {
+                await exportCollection(db, collection);
+              } catch (error: unknown) {
+                const message =
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to export collection.";
+                Alert.alert("Export Error", message);
+              }
+            },
+          },
           {
             text: "Delete",
             style: "destructive",

@@ -1,5 +1,5 @@
 import { getBoxesByCollection } from "@/db/boxes";
-import { getCollectionById } from "@/db/collections";
+import { exportCollection, getCollectionById } from "@/db/collections";
 import type { Collection, NestBox } from "@/types";
 import * as Location from "expo-location";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -7,6 +7,7 @@ import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -25,6 +26,7 @@ export default function CollectionMap() {
   const [loading, setLoading] = useState(true);
   const [locationDenied, setLocationDenied] = useState(false);
   const [mapLayoutDone, setMapLayoutDone] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Load collection and boxes from DB
   useEffect(() => {
@@ -81,6 +83,21 @@ export default function CollectionMap() {
     router.push(`/box/${boxId}` as unknown as never);
   }, []);
 
+  const handleExport = useCallback(async () => {
+    if (!collection) return;
+    try {
+      setExporting(true);
+      await exportCollection(db, collection);
+    } catch (error: unknown) {
+      Alert.alert(
+        "Export Error",
+        error instanceof Error ? error.message : "Failed to export collection.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }, [db, collection]);
+
   // Memoise markers so they don't re-render on every state change
   const markers = useMemo(
     () =>
@@ -113,7 +130,23 @@ export default function CollectionMap() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: collection?.name ?? "Collection" }} />
+      <Stack.Screen
+        options={{
+          title: collection?.name ?? "Collection",
+          headerRight: () => (
+            <Pressable
+              onPress={handleExport}
+              disabled={exporting}
+              accessibilityLabel="Export collection"
+              style={styles.headerButton}
+            >
+              <Text style={styles.headerButtonText}>
+                {exporting ? "Exporting…" : "Export"}
+              </Text>
+            </Pressable>
+          ),
+        }}
+      />
 
       {locationDenied && (
         <View style={styles.banner}>
@@ -163,6 +196,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   bannerText: { fontSize: 13, color: "#856404" },
+  headerButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  headerButtonText: { fontSize: 16, fontWeight: "600", color: "#007AFF" },
   map: { flex: 1 },
   addBoxContainer: {
     position: "absolute",

@@ -1,3 +1,6 @@
+import { summarize, toMDY } from "./format.ts";
+import type { Collection, NestBox, Observation } from "@/types";
+
 /** An observation parsed from a GeoJSON import, ready to be inserted. */
 export interface ParsedObservation {
   kind: "nest" | "box" | "legacy";
@@ -7,6 +10,9 @@ export interface ParsedObservation {
   eggs: number | null;
   chicks: number | null;
   cleaned_out: boolean;
+  box_not_found: boolean;
+  box_gone_pole_present: boolean;
+  pole_cut_down: boolean;
   notes: string;
 }
 
@@ -194,6 +200,9 @@ function parseNestNotesObservations(
         eggs,
         chicks,
         cleaned_out: Boolean(o.cleaned_out),
+        box_not_found: Boolean(o.box_not_found),
+        box_gone_pole_present: Boolean(o.box_gone_pole_present),
+        pole_cut_down: Boolean(o.pole_cut_down),
         notes: String(o.notes ?? ""),
       };
     });
@@ -235,6 +244,9 @@ function parseLegacyObservations(
       eggs: null,
       chicks: null,
       cleaned_out: false,
+      box_not_found: false,
+      box_gone_pole_present: false,
+      pole_cut_down: false,
       notes: desc,
     },
   ];
@@ -251,4 +263,106 @@ function stringifyExtraProps(
     }
   }
   return Object.keys(extra).length > 0 ? JSON.stringify(extra) : null;
+}
+
+/** An observation in the exported NestNotes GeoJSON format. */
+interface ExportObservation {
+  id: string;
+  kind: string;
+  observed_on: string;
+  inspector: string;
+  nests: number | null;
+  eggs: number | null;
+  chicks: number | null;
+  cleaned_out: boolean;
+  box_not_found?: boolean;
+  box_gone_pole_present?: boolean;
+  pole_cut_down?: boolean;
+  notes: string;
+}
+
+/** One human-readable history line for the legacy app's `desc`. */
+function describeForLegacy(obs: Observation): string {
+  const detail = [summarize(obs), obs.notes].filter(Boolean).join(" ");
+  return `${toMDY(obs.observed_on)} ${obs.inspector}: ${detail}`;
+}
+
+function toExportObservation(obs: Observation): ExportObservation {
+  const base: ExportObservation = {
+    id: obs.id,
+    kind: obs.kind,
+    observed_on: obs.observed_on,
+    inspector: obs.inspector,
+    nests: obs.nests,
+    eggs: obs.eggs,
+    chicks: obs.chicks,
+    cleaned_out: obs.cleaned_out,
+    notes: obs.notes,
+  };
+
+  // Box conditions only exist on box notes (M7); the legacy app ignores them.
+  if (obs.kind === "box") {
+    return {
+      ...base,
+      box_not_found: obs.box_not_found,
+      box_gone_pole_present: obs.box_gone_pole_present,
+      pole_cut_down: obs.pole_cut_down,
+    };
+  }
+
+  return base;
+}
+
+/**
+ * Serialize a collection to the NestNotes GeoJSON format (version 1).
+ *
+ * `properties.desc` is a human-readable history so the original app can still
+ * open the file; `properties.observations` is the structured data NestNotes
+ * re-imports with `parseCollection`.
+ *
+ * `observations` is the flat list for the whole collection and is grouped by
+ * `nest_box_id`, so a box with no notes still exports with an empty array.
+ */
+export function toGeoJSON(
+  collection: Collection,
+  boxes: NestBox[],
+  observations: Observation[],
+): string {
+  const byBox = new Map<string, Observation[]>();
+  for (const obs of observations) {
+    const list = byBox.get(obs.nest_box_id);
+    if (list) list.push(obs);
+    else byBox.set(obs.nest_box_id, [obs]);
+  }
+
+  const features = boxes.map((box) => {
+    const boxObs = byBox.get(box.id) ?? [];
+    return {
+      type: "Feature" as const,
+      id: box.id,
+      geometry: {
+        type: "Point" as const,
+        coordinates: [box.longitude, box.latitude],
+      },
+      properties: {
+        name: box.name,
+        desc: boxObs.map(describeForLegacy).join("\n"),
+        observations: boxObs.map(toExportObservation),
+      },
+    };
+  });
+
+  return JSON.stringify(
+    {
+      type: "FeatureCollection",
+      nestnotes: {
+        version: 1,
+        name: collection.name,
+        exported_at: new Date().toISOString(),
+      },
+      features,
+    },
+    null,
+    2,
+  );
 }

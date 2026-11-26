@@ -2,7 +2,8 @@ import assert from "node:assert";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { parseCollection } from "./geojson.ts";
+import { parseCollection, toGeoJSON } from "./geojson.ts";
+import type { Collection, NestBox, Observation } from "@/types";
 
 const samplePath = join(import.meta.dirname, "..", "..", "Sample.geojson");
 
@@ -291,4 +292,175 @@ describe("parseCollection", () => {
     const result = parseCollection(text);
     assert.strictEqual(result.boxes[0].name, "Box 1");
   });
+
+// ── toGeoJSON ────────────────────────────────────────────────────────
+
+const testCollection: Collection = {
+  id: "c1",
+  name: "South Loop",
+  created_at: "2026-11-01T00:00:00.000Z",
+  created_by: "local",
+  updated_at: "2026-11-01T00:00:00.000Z",
+  deleted_at: null,
+  sync_status: "pending",
+};
+
+function makeBox(
+  id: string,
+  name: string,
+  latitude: number,
+  longitude: number,
+): NestBox {
+  return {
+    id,
+    collection_id: testCollection.id,
+    name,
+    latitude,
+    longitude,
+    properties_json: null,
+    created_by: "local",
+    updated_at: "2026-11-01T00:00:00.000Z",
+    deleted_at: null,
+    sync_status: "pending",
+  };
+}
+
+function nestObs(overrides: Partial<Observation> = {}): Observation {
+  return {
+    id: "o1",
+    nest_box_id: "b1",
+    kind: "nest",
+    observed_on: "2026-10-21",
+    inspector: "Jane",
+    nests: 1,
+    eggs: 4,
+    chicks: 0,
+    cleaned_out: false,
+    notes: "",
+    created_by: "local",
+    updated_at: "2026-10-21T12:00:00.000Z",
+    deleted_at: null,
+    sync_status: "pending",
+    ...overrides,
+  } as Observation;
+}
+
+function boxObs(overrides: Partial<Observation> = {}): Observation {
+  return {
+    id: "o2",
+    nest_box_id: "b1",
+    kind: "box",
+    observed_on: "2026-10-22",
+    inspector: "John",
+    nests: null,
+    eggs: null,
+    chicks: null,
+    cleaned_out: false,
+    box_not_found: false,
+    box_gone_pole_present: false,
+    pole_cut_down: false,
+    notes: "",
+    created_by: "local",
+    updated_at: "2026-10-22T12:00:00.000Z",
+    deleted_at: null,
+    sync_status: "pending",
+    ...overrides,
+  } as Observation;
+}
+
+function legacyObs(overrides: Partial<Observation> = {}): Observation {
+  return {
+    id: "o3",
+    nest_box_id: "b1",
+    kind: "legacy",
+    observed_on: "2024-10-22",
+    inspector: "Imported",
+    nests: null,
+    eggs: null,
+    chicks: null,
+    cleaned_out: false,
+    notes: "Cleaned box and put back on pole. Needs paint. 10/21/26",
+    created_by: "local",
+    updated_at: "2024-10-22T21:45:15.000Z",
+    deleted_at: null,
+    sync_status: "pending",
+    ...overrides,
+  } as Observation;
+}
+
+describe("toGeoJSON", () => {
+  it("writes the NestNotes header and a legacy-readable desc", () => {
+    const boxes = [makeBox("b1", "Box 71", 42.620495, -116.503128)];
+    const observations: Observation[] = [
+      nestObs({ cleaned_out: true }),
+    ];
+
+    const root = JSON.parse(toGeoJSON(testCollection, boxes, observations));
+
+    assert.strictEqual(root.type, "FeatureCollection");
+    assert.strictEqual(root.nestnotes.version, 1);
+    assert.strictEqual(root.nestnotes.name, "South Loop");
+    assert.strictEqual(typeof root.nestnotes.exported_at, "string");
+
+    assert.strictEqual(root.features.length, 1);
+    const feature = root.features[0];
+    assert.strictEqual(feature.id, "b1");
+    assert.strictEqual(feature.properties.name, "Box 71");
+    assert.deepStrictEqual(feature.geometry, {
+      type: "Point",
+      coordinates: [-116.503128, 42.620495],
+    });
+    assert.strictEqual(
+      feature.properties.desc,
+      "10/21/2026 Jane: 1 nest, 4 eggs, 0 chicks, cleaned",
+    );
+  });
+
+  it("round trips boxes and observations through parseCollection", () => {
+    const boxes = [
+      makeBox("b1", "Box 71", 42.620495, -116.503128),
+      makeBox("b2", "Empty box", 42.6, -116.5),
+    ];
+    // Newest first, the order the DB returns them in.
+    const observations: Observation[] = [
+      boxObs({ box_gone_pole_present: true, notes: "Pole still there" }),
+      nestObs({ cleaned_out: true, notes: "Good box" }),
+      legacyObs(),
+    ];
+
+    const result = parseCollection(
+      toGeoJSON(testCollection, boxes, observations),
+    );
+
+    assert.strictEqual(result.name, "South Loop");
+    assert.strictEqual(result.skipped, 0);
+    assert.strictEqual(result.boxes.length, 2);
+
+    const [b1, b2] = result.boxes;
+    assert.strictEqual(b1.name, "Box 71");
+    assert.strictEqual(b1.latitude, 42.620495);
+    assert.strictEqual(b1.longitude, -116.503128);
+    assert.strictEqual(b1.observations.length, 3);
+
+    assert.strictEqual(b1.observations[0].kind, "box");
+    assert.strictEqual(b1.observations[0].box_gone_pole_present, true);
+    assert.strictEqual(b1.observations[0].box_not_found, false);
+    assert.strictEqual(b1.observations[0].notes, "Pole still there");
+
+    assert.strictEqual(b1.observations[1].kind, "nest");
+    assert.strictEqual(b1.observations[1].nests, 1);
+    assert.strictEqual(b1.observations[1].eggs, 4);
+    assert.strictEqual(b1.observations[1].cleaned_out, true);
+    assert.strictEqual(b1.observations[1].notes, "Good box");
+
+    assert.strictEqual(b1.observations[2].kind, "legacy");
+    assert.ok(
+      b1.observations[2].notes.includes("Cleaned box and put back on pole"),
+    );
+
+    assert.strictEqual(b2.name, "Empty box");
+    assert.strictEqual(b2.observations.length, 0);
+  });
+});
+
 });
