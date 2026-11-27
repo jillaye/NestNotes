@@ -109,9 +109,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  // ponytail: minHeight (not height) so the control grows with the OS font size
+  // instead of clipping its glyph. Ceiling: the fixed 48px tap width can clip "−"/"+"
+  // at the extreme 3.2× accessibility scale — widen if that ever matters.
   btn: {
     width: 48,
-    height: 48,
+    minHeight: 48,
     borderRadius: 8,
     backgroundColor: "#e0e0e0",
     alignItems: "center",
@@ -133,7 +136,7 @@ const styles = StyleSheet.create({
   },
   input: {
     width: 64,
-    height: 48,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,

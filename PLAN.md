@@ -193,8 +193,15 @@ Indexes: `nest_boxes(collection_id)`, `observations(box_id)`.
 ## M9: Field-readiness polish
 
 - [ ] Airplane-mode pass through the whole flow on a real Android phone and iPhone.
+      `ponytail:` code audited — the app makes no network calls (the only `fetch` reads a
+      local `file://` URI handed back by the document picker), so the flow is offline by
+      construction. The on-device pass is still manual.
 - [ ] Large OS font sizes and dark mode check.
-- [ ] Remove leftover dev code. Update the README (offline map tip, import/export/delete).
+      `ponytail:` code side done — the app is pinned to light (`userInterfaceStyle: "light"`
+      + `<StatusBar style="dark" />`) so the hardcoded high-contrast field styles match the
+      native header and status bar, and `Stepper` grows with the OS font size instead of
+      clipping. The on-device glance is still manual.
+- [x] Remove leftover dev code. Update the README (offline map tip, import/export/delete).
 
 ---
 
