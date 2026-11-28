@@ -1,0 +1,4 @@
+# GeoJSON stays hand-formatted: one coordinate per line.
+# Prettier's JSON printer always collapses short arrays, so format-on-save
+# would undo the expanded layout. See .prettierrc "overrides" for *.geojson.
+*.geojson

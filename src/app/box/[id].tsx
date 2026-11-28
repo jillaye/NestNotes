@@ -106,6 +106,24 @@ export default function BoxSheet() {
         {box.latitude.toFixed(6)}, {box.longitude.toFixed(6)}
       </Text>
 
+      <View style={styles.buttons}>
+        <Pressable
+          style={styles.button}
+          onPress={handleNewObservation}
+          accessibilityLabel="New Observation"
+        >
+          <Text style={styles.buttonText}>New Observation</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.button}
+          onPress={handleNavigate}
+          accessibilityLabel="Navigate to box"
+        >
+          <Text style={styles.buttonText}>Navigate to box</Text>
+        </Pressable>
+      </View>
+
       {observations.length > 0 && (
         <View style={styles.notesSection}>
           <Text style={styles.sectionLabel}>Notes</Text>
@@ -124,24 +142,6 @@ export default function BoxSheet() {
           <Text style={styles.emptyText}>No notes yet.</Text>
         </View>
       )}
-
-      <View style={styles.buttons}>
-        <Pressable
-          style={styles.button}
-          onPress={handleNewObservation}
-          accessibilityLabel="New Observation"
-        >
-          <Text style={styles.buttonText}>New Observation</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.button}
-          onPress={handleNavigate}
-          accessibilityLabel="Navigate to this box"
-        >
-          <Text style={styles.buttonText}>Navigate to</Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -201,13 +201,16 @@ const styles = StyleSheet.create({
     color: "#999",
   },
   buttons: {
-    paddingVertical: 16,
+    flexDirection: "row",
+    paddingBottom: 16,
     gap: 12,
   },
   button: {
+    flex: 1,
     backgroundColor: "#007AFF",
     borderRadius: 12,
     paddingVertical: 14,
+    paddingHorizontal: 6,
     alignItems: "center",
   },
   buttonText: {
