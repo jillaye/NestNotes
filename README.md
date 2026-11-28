@@ -1,7 +1,7 @@
 # NestNotes
 
 Offline-first mobile app for bluebird nest-box trail volunteers. Load a trail
-(a **Collection** of GPS-tagged nest boxes), walk it, and record what you find at
+(a **Collection** of GPS-tagged nest boxes), drive it, and record what you find at
 each box — nests, eggs, chicks, cleaned-out, or "box missing" conditions.
 
 Everything is stored on the phone in `expo-sqlite`. There are no accounts and no

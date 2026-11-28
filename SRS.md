@@ -15,12 +15,14 @@ See [nestnotes.md](.clinerules/nestnotes.md)
 
 - Collection - a group of nest boxes along with information on that nest box. My initial thought is that a collection can be encapsulated into a GeoJSON file.
 - Observation - generic term for notes taken on one visit to the box
+- Nest Note - a log entry a user makes when they visit an intact bluebird box. It contains info about nests, eggs, chicks, etc.
+- Box Note - a log entry a user makes when a bluebird box is either damaged, missing, or otherwise not available.
 
 # Screens
 
 ## Splash screen
 
-The splash screen shall allow the user to choose a Collection.
+The splash screen shall allow the user to choose an existing Collection or import a new Collection.
 
 ## Map screen
 
@@ -34,10 +36,10 @@ Tapping a nest box opens a dismissable bottom sheet over the map with info on th
 - GPS coordinates
 - Notes - one line per date that notes were taken on that box
 
-There shall be 2 buttons at the bottom of the sheet:
+There shall be 2 buttons on the sheet:
 
 1. New Observation button takes user to the Observation screen
-2. Navigate to button uses the phones default mapping application (Google Maps on Android, Apple Maps on iOS) give the user turn-by-turn directions to the box
+2. Navigate to box button uses the phones default mapping application (Google Maps on Android, Apple Maps on iOS) to give the user turn-by-turn directions to the box
 
 ## Observation screen
 
@@ -60,7 +62,7 @@ The app will offer the following fields for the user to fill in:
 - number of nests (integer)
 - number of eggs (integer)
 - number of chicks (integer)
-- boxes cleaned out (boolean)
+- user cleaned box out (boolean)
 - notes (text) here the user can place misc notes
 
 ## Box Note fields

@@ -160,6 +160,8 @@ export default function CollectionMap() {
       <MapView
         ref={mapRef}
         style={styles.map}
+        mapType="hybrid" // sattelite view + labels for roads, etc
+        userInterfaceStyle="light"
         showsUserLocation
         showsMyLocationButton
         onLayout={onLayout}
